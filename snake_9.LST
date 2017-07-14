@@ -1,0 +1,494 @@
+C51 COMPILER V8.18   SNAKE_9                                                               07/06/2017 17:03:19 PAGE 1   
+
+
+C51 COMPILER V8.18, COMPILATION OF MODULE SNAKE_9
+OBJECT MODULE PLACED IN snake_9.OBJ
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE snake_9.c BROWSE DEBUG OBJECTEXTEND
+
+line level    source
+
+   1          /*
+   2          2017.07.02
+   3          final !!
+   4          Can control up & down & left & right! Add random (OK) !
+   5          Add food & eaten food!(OK)
+   6          Add random start seat!(OK)
+   7          Add speed!(OK)
+   8          確認頭部和食物都沒問題!
+   9          問題 : 尾巴顯示和移動的問題! (OK)
+  10          use 89s51 will happen error : data memory too large! (OK)
+  11          grade bug !(OK)
+  12          body bug....(body 1 2 OK)
+  13          win & lost(OK)
+  14          improve the button sensitivity!
+  15          author:lypon
+  16          */
+  17          #include<AT89X52.H>
+  18          #include<stdlib.h>
+  19          #include<INTRINS.H>
+  20          
+  21          /////////// function /////////////////
+  22          
+  23          int random(int *seed);                            // 取亂數
+  24          void initial(unsigned char matrix[]);             // 重新初始化陣列
+  25          void direction(int *Direction);                   // 方向
+  26          void move(int *Head_start_num,int *Direction);// 移動
+  27          void food(void);                                                          // 產生食物
+  28          void food_check(int *Head_start_num);             // 確認食物是否重疊到頭部
+  29          void match(void);                             // 把要顯示的陣列都合起來
+  30          void scan(unsigned char k);                       // 掃描顯示
+  31          void delayms(unsigned int time);                  // 延遲時間
+  32          
+  33          void Direction_matrix_right(void);
+  34          void tail_move(void);
+  35          
+  36          ///////////////////////////////////////
+  37          
+  38          /////////// display matrix/////////////
+  39          
+  40          unsigned char start_seat[] = {0x80,0x40,0x20,0x10,0x08,0x04,0x02,0x01};
+  41          unsigned char head_show[] = {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
+  42          unsigned char food_show[] = {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
+  43          unsigned char body_display[] = {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
+  44          unsigned char display[] = {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
+  45          unsigned char win[] = {0x3c,0x42,0x95,0xa1,0xa1,0x95,0x42,0x3c};
+  46          unsigned char defeat[] = {0x3c,0x42,0xa5,0x91,0x91,0xa5,0x42,0x3c};
+  47          unsigned char go[] = {0x7e,0x81,0x71,0xf6,0x7e,0x81,0x81,0x7e};
+  48          unsigned char idata tail[] = {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
+  49          unsigned char idata tail_temp[] = {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};      // 尾巴移動前位置
+  50          unsigned char idata head_show_temp[] = {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00}; // 頭移動前位置
+  51          char idata Direction_matrix[64] = {0};
+  52          
+  53          ///////////////////////////////////////
+  54          
+  55          //////////// global variable //////////
+C51 COMPILER V8.18   SNAKE_9                                                               07/06/2017 17:03:19 PAGE 2   
+
+  56          
+  57          int set_win_grade = 63;                  // 勝利分數
+  58          bit lost = 0;                           // 失敗開關
+  59          bit eaten = 0;                                                  // 進食開關
+  60          int seed = 3;                           // 亂數種子
+  61          int grade = 0;                                              // 分數
+  62          int grade_temp;                                                 // 分數比較
+  63          char food_start = 0x00;                                 // 食物初始位置
+  64          int food_num = 0;                                               // 食物初始位置
+  65          
+  66          
+  67          int Direction_num = 1;                  // 尾巴要移動方向的位置
+  68          int tail_start_num = 0;                                 // 尾巴開始位置           
+  69          int tail_start_num_temp = 0;                    // 尾巴移動前位置數字
+  70          int head_start_num_temp = 0;                    // 頭移動前位置數字
+  71          int speed = 45;                                                 // 速度
+  72          bit start = 0;
+  73          ///////////////////////////////////////
+  74          
+  75          main()
+  76          {
+  77   1              int Head_start_num = random(&seed)%8; // need find turly random way ! decide start row
+  78   1              int Direction_key = 1; //default direction down
+  79   1              int i;
+  80   1              unsigned char x=0;
+  81   1              unsigned char t;
+  82   1              
+  83   1              P3 = 0x00;                            // P3 不清楚為什麼不能放在前面設定?
+  84   1              
+  85   1              ///////////////////// 隨機決定起始位置 //////////////////////
+  86   1              
+  87   1              while(P3 != 0x80)
+  88   1              {
+  89   2                      for(t=0;t<15;t++)  // speed
+  90   2                      {
+  91   3                              scan(x);
+  92   3                      }
+  93   2                      seed++;
+  94   2              }
+  95   1                      seed++;
+  96   1              
+  97   1              Head_start_num = random(&seed)%8;
+  98   1              
+  99   1              head_show[Head_start_num] = start_seat[Head_start_num];
+ 100   1              
+ 101   1              /////////////////////////////////////////////////////////////
+ 102   1              food();
+ 103   1              
+ 104   1              while(1)
+ 105   1              {
+ 106   2                      start = 1;
+ 107   2                      initial(display);
+ 108   2                      
+ 109   2                      if(grade == 0)                                  // 當還沒有身體的時候，要不斷地記錄尾巴的位置(�
+             -�移動前的位置等於尾巴的位置)
+ 110   2                      {
+ 111   3                              tail[Head_start_num] = head_show[Head_start_num];
+ 112   3                              tail_start_num = Head_start_num;
+ 113   3                      }
+ 114   2                              
+ 115   2                      
+ 116   2                      if(seed > 20000)
+C51 COMPILER V8.18   SNAKE_9                                                               07/06/2017 17:03:19 PAGE 3   
+
+ 117   2                              seed = 1;
+ 118   2      
+ 119   2                      food_check(&Head_start_num);
+ 120   2                      
+ 121   2                      if (grade_temp == grade)  // 如果 grade_temp 等於 grade 就代表現在沒有再進食可以進行�
+             -�沒有咬到身體的判斷!!
+ 122   2                              eaten = 0;
+ 123   2                      
+ 124   2                      if(grade >= 1)                                                     // 當分數大於1也就是身體長度大於1的時候，開始
+             -記錄頭移動前的位置，
+ 125   2                      {                                                                                                  // 因為移動前的頭位置和尾巴的位置已經不一樣了!!
+ 126   3                              head_show_temp[Head_start_num] = head_show[Head_start_num];
+ 127   3                              head_start_num_temp = Head_start_num;
+ 128   3                      }
+ 129   2                      
+ 130   2                      grade_temp = grade;       // 為了保存這次的 grade_temp 所以選擇在判斷完 grade_temp 和 gr
+             -ade是否相等後再刷新!!
+ 131   2                      
+ 132   2                      move(&Head_start_num,&Direction_key); // snack moving
+ 133   2              
+ 134   2                      Direction_matrix[0] = Direction_key;  // 記錄每一次頭移動的方向
+ 135   2                      Direction_matrix_right();                         // 每移動一次就把方向陣列右移一格
+ 136   2                      
+ 137   2                      if(grade > 0)
+ 138   2                      {
+ 139   3                              if(eaten == 1 && grade != grade_temp)
+ 140   3                              {
+ 141   4                                      body_display[tail_start_num] = body_display[tail_start_num] | tail[tail_start_num];  // 進食中，�
+             -�巴不向前移動直接變成當前的尾巴
+ 142   4                                      body_display[head_start_num_temp] = body_display[head_start_num_temp] | head_show_temp[head_start_num_
+             -temp]; // 並將移動前的頭加入body_display中
+ 143   4                                      Direction_num++;                         // 每進食一次就要把尾巴要移動第幾個位置的方向陣列的數字�
+             -��加1
+ 144   4                              }
+ 145   3                                      
+ 146   3                              else if(grade == grade_temp)
+ 147   3                              {
+ 148   4                                      tail_temp[tail_start_num] = tail[tail_start_num];    // 儲存尾巴上一個位置
+ 149   4                                      tail_start_num_temp = tail_start_num;
+ 150   4                                      
+ 151   4                                      tail_move();                            // 尾巴移動
+ 152   4                                      
+ 153   4                                      body_display[head_start_num_temp] = body_display[head_start_num_temp] | head_show_temp[head_start_num_
+             -temp]; // 將移動前的頭加入body_display中
+ 154   4                                      body_display[tail_start_num] =  body_display[tail_start_num] | tail[tail_start_num] ;                                            // 將移
+             -動後的尾巴加入body_display中
+ 155   4                                      body_display[tail_start_num_temp] = body_display[tail_start_num_temp] ^ tail_temp[tail_start_num_temp]
+             -;      // 把移動前的尾巴消除
+ 156   4                              }
+ 157   3                      }
+ 158   2      
+ 159   2                      
+ 160   2                      if(eaten == 0)
+ 161   2                              for(i=0;i<8;i++)                  // decition lost !!
+ 162   2                                      if (head_show[Head_start_num] == (body_display[i] & head_show[Head_start_num]) && Head_start_num == i)
+ 163   2                                      lost = 1;
+ 164   2                      
+ 165   2                      match();
+ 166   2      
+ 167   2                      
+ 168   2                      if(grade >= set_win_grade)
+ 169   2                              grade = set_win_grade;
+C51 COMPILER V8.18   SNAKE_9                                                               07/06/2017 17:03:19 PAGE 4   
+
+ 170   2                                              
+ 171   2                      for(t=0;t<speed;t++)  // speed
+ 172   2                      {
+ 173   3                              direction(&Direction_key); //decide direction
+ 174   3                              scan(x);
+ 175   3                      }
+ 176   2                      
+ 177   2                      seed++;
+ 178   2              }
+ 179   1      
+ 180   1              return 0;       
+ 181   1              
+ 182   1      }
+ 183          
+ 184          ///////////////////// random /////////////////
+ 185          
+ 186          int random(int *seed)
+ 187          {
+ 188   1              srand(*seed);
+ 189   1              return rand();
+ 190   1      }
+ 191          
+ 192          //////////////////////////////////////////////
+ 193          
+ 194          ///////////////////// initial ////////////////
+ 195          
+ 196          void initial(unsigned char matrix[])
+ 197          {
+ 198   1              int i;
+ 199   1              char temp = 0x00;
+ 200   1              for(i=0;i<8;i++)
+ 201   1              {
+ 202   2                      matrix[i] = temp;
+ 203   2              }
+ 204   1      }
+ 205          
+ 206          ///////////////////////////////////////////////
+ 207          
+ 208          //////////////////// direction ////////////////
+ 209          
+ 210          void direction(int *Direction)
+ 211          {       
+ 212   1              switch(P3)
+ 213   1              {
+ 214   2                      case 0x00:
+ 215   2                      {
+ 216   3                              *Direction = *Direction;
+ 217   3                              break; //default
+ 218   3                      }
+ 219   2                      case 0x01:
+ 220   2                      {
+ 221   3                              if(*Direction == 1)
+ 222   3                                      break;
+ 223   3                              *Direction = 0; // up
+ 224   3                              break;
+ 225   3                      }
+ 226   2                      case 0x02:
+ 227   2                      {
+ 228   3                              if(*Direction == 0)
+ 229   3                                      break;
+ 230   3                              *Direction = 1; // down
+ 231   3                              break;
+C51 COMPILER V8.18   SNAKE_9                                                               07/06/2017 17:03:19 PAGE 5   
+
+ 232   3                      }
+ 233   2                      case 0x04:
+ 234   2                      {
+ 235   3                              if(*Direction == 3)
+ 236   3                                      break;
+ 237   3                              *Direction = 2; // left
+ 238   3                              break;
+ 239   3                      }
+ 240   2                      case 0x08:
+ 241   2                      {
+ 242   3                              if(*Direction == 2)
+ 243   3                                      break;
+ 244   3                              *Direction = 3; // right
+ 245   3                              break;
+ 246   3                      }
+ 247   2                              
+ 248   2              }
+ 249   1      }
+ 250          
+ 251          ///////////////////////////////////////////////
+ 252          
+ 253          //////////////////// move /////////////////////
+ 254          
+ 255          void move(int *Head_start_num,int *Direction)
+ 256          {
+ 257   1              int i = 0;
+ 258   1              int temp = 0x00;
+ 259   1              int Head_start_num_right = (*Head_start_num+1)%8;
+ 260   1              int Head_start_num_left = (*Head_start_num-1)%8;
+ 261   1      
+ 262   1              if (Head_start_num_left == -1)
+ 263   1                      Head_start_num_left = 7;
+ 264   1              if (Head_start_num_right == 8)
+ 265   1                      Head_start_num_right = 0;
+ 266   1                      
+ 267   1              if (*Direction == 0)
+ 268   1              {
+ 269   2                      head_show[*Head_start_num] = _cror_(head_show[*Head_start_num],1); // move 1 up
+ 270   2              }
+ 271   1              
+ 272   1              if (*Direction == 1)
+ 273   1              {
+ 274   2                      head_show[*Head_start_num] = _crol_(head_show[*Head_start_num],1); // move 1 down
+ 275   2              }
+ 276   1              
+ 277   1              if (*Direction == 2)
+ 278   1              {
+ 279   2                      head_show[Head_start_num_right] = head_show[*Head_start_num]; // move 1 right
+ 280   2                      head_show[*Head_start_num] = temp;
+ 281   2                      *Head_start_num = Head_start_num_right;
+ 282   2              }
+ 283   1              
+ 284   1              if (*Direction == 3)
+ 285   1              {
+ 286   2                      head_show[Head_start_num_left] = head_show[*Head_start_num]; //move 1 left
+ 287   2                      head_show[*Head_start_num] = temp;
+ 288   2                      *Head_start_num = Head_start_num_left;
+ 289   2              }
+ 290   1              
+ 291   1              if (food_start == head_show[*Head_start_num] && food_num == *Head_start_num )
+ 292   1              {
+ 293   2                      grade = grade + 1;
+C51 COMPILER V8.18   SNAKE_9                                                               07/06/2017 17:03:19 PAGE 6   
+
+ 294   2                      eaten = 1;
+ 295   2                      speed--;
+ 296   2                      if(speed < 5)
+ 297   2                              speed = 5;
+ 298   2              }
+ 299   1      }
+ 300          
+ 301          ///////////////////////////////////////////////
+ 302          
+ 303          //////////////////// food /////////////////////
+ 304          
+ 305          void food(void)
+ 306          {
+ 307   1              initial(food_show);
+ 308   1              seed++;
+ 309   1              food_start = start_seat[random(&seed)%8];
+ 310   1              seed++;
+ 311   1              food_num = random(&seed)%8;
+ 312   1      }
+ 313          
+ 314          ///////////////////////////////////////////////
+ 315          
+ 316          //////////////////// food_check ///////////////
+ 317          
+ 318          void food_check(int *Head_start_num)
+ 319          {
+ 320   1              if (food_start == head_show[*Head_start_num] && food_num == *Head_start_num ) // 判斷食物是否與頭
+             -重疊
+ 321   1              {
+ 322   2                      food();
+ 323   2                      food_check(Head_start_num);
+ 324   2              }
+ 325   1              else
+ 326   1                      food_show[food_num] = food_start;
+ 327   1                      
+ 328   1      }
+ 329          
+ 330          ///////////////////////////////////////////////
+ 331          
+ 332          //////////////////// match ////////////////////
+ 333          
+ 334          void match(void)
+ 335          {
+ 336   1              int i;
+ 337   1              for(i=0;i<8;i++)
+ 338   1              {
+ 339   2                      display[i] = food_show[i] | head_show[i] | body_display[i] ;
+ 340   2              }
+ 341   1      
+ 342   1      }
+ 343          
+ 344          ///////////////////////////////////////////////
+ 345          
+ 346          ///////////////////// scan ////////////////////
+ 347          
+ 348          void scan(unsigned char k)
+ 349          {
+ 350   1              unsigned char m;
+ 351   1              unsigned char com;
+ 352   1              com = 0xfe;
+ 353   1              for(m=0;m<8;m++)
+ 354   1              {
+C51 COMPILER V8.18   SNAKE_9                                                               07/06/2017 17:03:19 PAGE 7   
+
+ 355   2                      if (grade >= set_win_grade)
+ 356   2                              P1 = win[k];
+ 357   2                      else if (lost == 1)
+ 358   2                              P1 = defeat[k];
+ 359   2                      else if (start == 0)
+ 360   2                              P1 = go[k];
+ 361   2                      else
+ 362   2                              P1 = display[k];
+ 363   2                      P2 = com;
+ 364   2                      delayms(2);
+ 365   2                      P2 = 0xff;
+ 366   2                      com = _crol_(com,1);
+ 367   2                      k++;
+ 368   2              }
+ 369   1      }
+ 370          
+ 371          ////////////////////////////////////////////////
+ 372          
+ 373          ///////////////////// delayms //////////////////
+ 374          
+ 375          void delayms(unsigned int time)
+ 376          {
+ 377   1              unsigned int n;
+ 378   1              while(time>0)
+ 379   1              {
+ 380   2                      n=120;
+ 381   2                      while(n>0) n--;
+ 382   2                      time--;
+ 383   2              }
+ 384   1      }
+ 385          
+ 386          /////////////////////////////////////////////////
+ 387          
+ 388          //////////// Direction_matrix_right ////////////////
+ 389          
+ 390          void Direction_matrix_right(void)
+ 391          {
+ 392   1              int i;
+ 393   1      
+ 394   1              for(i=63;i>0;i--)
+ 395   1              {
+ 396   2                      Direction_matrix[i] = Direction_matrix[i-1];
+ 397   2              }
+ 398   1      }
+ 399          
+ 400          /////////////////////////////////////////////////
+ 401          
+ 402          ////////////////// tail_move /////////////////////////
+ 403          
+ 404          void tail_move(void)
+ 405          {
+ 406   1              int i = 0;
+ 407   1              int temp = 0x00;
+ 408   1              int tail_start_num_right = (tail_start_num+1)%8;
+ 409   1              int tail_start_num_left = (tail_start_num-1)%8;
+ 410   1      
+ 411   1              if (tail_start_num_left == -1)
+ 412   1                      tail_start_num_left = 7;
+ 413   1              if (tail_start_num_right == 8)
+ 414   1                      tail_start_num_right = 0;
+ 415   1                      
+ 416   1              if (Direction_matrix[Direction_num] == 0)
+C51 COMPILER V8.18   SNAKE_9                                                               07/06/2017 17:03:19 PAGE 8   
+
+ 417   1              {
+ 418   2                      tail[tail_start_num] = _cror_(tail[tail_start_num],1); // move 1 up
+ 419   2              }
+ 420   1              
+ 421   1              if (Direction_matrix[Direction_num] == 1)
+ 422   1              {
+ 423   2                      tail[tail_start_num] = _crol_(tail[tail_start_num],1); // move 1 down
+ 424   2              }
+ 425   1              
+ 426   1              if (Direction_matrix[Direction_num] == 2)
+ 427   1              {
+ 428   2                      tail[tail_start_num_right] = tail[tail_start_num]; // move 1 right
+ 429   2                      tail[tail_start_num] = temp;
+ 430   2                      tail_start_num = tail_start_num_right;
+ 431   2              }
+ 432   1              
+ 433   1              if (Direction_matrix[Direction_num] == 3)
+ 434   1              {
+ 435   2                      tail[tail_start_num_left] = tail[tail_start_num]; //move 1 left
+ 436   2                      tail[tail_start_num] = temp;
+ 437   2                      tail_start_num = tail_start_num_left;
+ 438   2              }
+ 439   1              
+ 440   1      }
+ 441          
+ 442          /////////////////////////////////////////////////////
+ 443          
+ 444          
+ 445          
+ 446          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   1502    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =     85      31
+   IDATA SIZE       =     88    ----
+   BIT SIZE         =      3    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)
